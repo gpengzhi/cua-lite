@@ -1,0 +1,39 @@
+# Qwen3.5 desktop.use — native screenshot, NATIVE <think> reasoning.
+#
+# The full-resolution counterpart of desktop.use.compact.reasoning.yaml (the config
+# examples/lite/v1/README.md runs). Use this one when the VRAM is there: the agent
+# sees the env's screenshot untouched.
+#
+# One config for the WHOLE desktop.use family (Lite.OSWorld / Lite.ScaleCUA /
+# Lite.CUAGym / Lite.CUAWorld). They share the same qwen3_5 desktop.use adapter, so a
+# single config drives the joint export.
+#
+# The four configs here are a 2x2 over screenshot size x reasoning mode; nothing else
+# differs between them:
+#
+#   desktop.use.default.yaml            native res  Action-only
+#   desktop.use.default.reasoning.yaml  native res  <think>       <- this file
+#   desktop.use.compact.yaml            1280x720    Action-only
+#   desktop.use.compact.reasoning.yaml  1280x720    <think>
+#
+# Reasoning uses Qwen3.5's NATIVE <think>...</think> channel (enable_thinking: true) —
+# NOT a prompted "Thought:" system prompt. system_prompt is omitted, so the adapter
+# falls back to its canonical USE_SYSTEM_PROMPT (Action-only, no Thought: line).
+# The teacher stores its Thought as an inline_reasoning content part, so run
+# examples/lite/v1/internalize_cot.py on the dataset FIRST to move it into the
+# reasoning_content field — the chat template then renders it as <think>.
+#
+# NO env_id: export_sft never reads it (adapter is picked per-row from the data's
+# metadata.dims + this agent_id → qwen3_5@desktop@use). For RL/rollout
+# the env is selected separately (ENV_ID / --env-id), and env_kwargs below apply.
+
+agent_id: "qwen3_5"
+agent_kwargs:
+  enable_thinking: true     # native <think> channel (no prompted Thought:/Action: format)
+  # resolution omitted     → no agent-side downsample. Qwen smart_resize still
+  #                          rounds each side to a multiple of 32 and caps pixels.
+  # protocol_kwargs omitted → Qwen3_5HistoryProtocol defaults
+  #                           (history_n=50, image_max=4, fold_size=4).
+
+env_kwargs:
+  max_steps: 30

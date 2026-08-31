@@ -1,0 +1,33 @@
+# Qwen3.5 desktop.use — native screenshot, Action-only (NO reasoning).
+#
+# The BASE-model counterpart of desktop.use.default.reasoning.yaml: native screenshot,
+# no reasoning channel. The base model never saw the inline-reasoning recipe, so a
+# .reasoning config would unfairly handicap it; this is the clean Action-only baseline
+# to compare an SFT/RL checkpoint against.
+#
+# One config for the WHOLE desktop.use family (Lite.OSWorld / Lite.ScaleCUA /
+# Lite.CUAGym / Lite.CUAWorld). They share the same qwen3_5 desktop.use adapter.
+#
+# The four configs here are a 2x2 over screenshot size x reasoning mode; nothing else
+# differs between them:
+#
+#   desktop.use.default.yaml            native res  Action-only  <- this file
+#   desktop.use.default.reasoning.yaml  native res  <think>
+#   desktop.use.compact.yaml            1280x720    Action-only
+#   desktop.use.compact.reasoning.yaml  1280x720    <think>
+#
+# system_prompt is omitted, so the adapter falls back to its canonical
+# USE_SYSTEM_PROMPT (Action-only, no Thought: line).
+#
+# NO env_id: the env is selected by --env-id (required; CLI overrides config), so one
+# config evals any desktop env. env_kwargs below apply at rollout.
+
+agent_id: "qwen3_5"
+agent_kwargs:
+  # resolution omitted     → no agent-side downsample. Qwen smart_resize still
+  #                          rounds each side to a multiple of 32 and caps pixels.
+  # protocol_kwargs omitted → Qwen3_5HistoryProtocol defaults
+  #                           (history_n=50, image_max=4, fold_size=4).
+
+env_kwargs:
+  max_steps: 30

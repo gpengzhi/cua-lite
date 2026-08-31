@@ -1,0 +1,35 @@
+# UI-Venus-2-9B rollout eval on OSWorld-G
+# Single-step point grounding. UI-Venus-2 has a TRAINED refusal output:
+# ``[-1,-1]`` lowers to the env's ``report_infeasible`` extra tool, so the
+# ``exclude_reason="refusal"`` split is meaningful here rather than noise. Drop it
+# with ``--filter "lambda m: not m.others.get('exclude_reason')"`` when comparing
+# against a family that cannot refuse.
+#
+# Wire format: NO system message and no tag block — the whole instruction surface
+# is one user message holding the screenshot then the prompt, and the answer is a
+# bare ``[x,y]`` list normalized to 1000. Single-step, so there is no history and
+# no image window.
+#
+# Sampling is greedy. ``max_new_tokens`` is left unset, i.e. the 2048 rollout
+# default (``DEFAULT_SAMPLING_KWARGS`` in /lite/infer/serving.py), matching every
+# sibling grounding row. The answer is one short list, but ``enable_thinking``
+# leaves ``<think>`` open in the generation prompt, so the budget has to cover
+# the reasoning in front of it.
+#
+# Related configs:
+#   - scripts/configs/ui_venus_2/default/screenspot_pro.yaml  (sibling grounding bench)
+
+agent_id: "ui_venus_2"
+agent_kwargs:
+  sampling_kwargs:  # only honored by rollout.py; RL sets sampling via the trainer (--rollout-temperature/--eval-temperature)
+    temperature: 0.0
+
+env_id: "osworld_g"
+env_kwargs:
+  # The header above promises the refusal split is SCORED here, which only holds
+  # if the tool is active: osworld_g defaults to ``extra_tools: []`` and drops an
+  # inactive ``report_infeasible`` before it can be executed, so without this the
+  # 54 refusal tasks score 0 while the model answers them correctly. Note the
+  # campaign runbook (/devs/exps/eval/osworld_g/run.sh) filters those 54 tasks
+  # out, so this only changes a hand-run rollout that drops --filter.
+  extra_tools: ["report_infeasible"]
