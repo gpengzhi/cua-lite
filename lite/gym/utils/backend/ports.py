@@ -112,11 +112,11 @@ def _is_port_free(port: int) -> bool:
     Checks the IPv4 wildcard and loopback plus the IPv6 loopback and
     wildcard WITHOUT SO_REUSEADDR, so that ports held by Docker containers
     (which bind both stacks) are detected as in-use. On hosts where a
-    probed address does not exist (IPv6-disabled hosts are the common
-    case), the bind raises EADDRNOTAVAIL/EAFNOSUPPORT for every port — an
-    address problem, not a port conflict — so those errnos skip the probe
-    instead of marking every port in-use (which would exhaust every band
-    on the host).
+    probed address does not exist — no IPv6 stack at all, or no ``::1``
+    on loopback — the probe raises EAFNOSUPPORT/EADDRNOTAVAIL for every
+    port: an address problem, not a port conflict. Those errnos skip the
+    probe instead of marking every port in-use (which would exhaust every
+    band on the host).
     """
     for family, host in [
         (socket.AF_INET, "0.0.0.0"),

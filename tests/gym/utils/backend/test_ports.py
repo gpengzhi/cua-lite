@@ -1,15 +1,14 @@
 """Bind-probe behavior for lite.gym.utils.backend.ports.
 
 Guards the host-capability edges the probe must survive. On hosts without
-an IPv6 loopback (such hosts are common where IPv6 is disabled at the host
-level) every ``bind(("::1", port))`` raises EADDRNOTAVAIL, which must NOT
-be read as a port conflict — otherwise every port tests in-use and
-``allocate_ports`` can never hand out a port. A missing ``::1`` must not
-blind the probe to a v6-only wildcard holder on ``[::]``, and a non-family
-failure of the ``[::]`` probe must count as in-use. Genuine ::1 and IPv4
-conflicts must always be detected.
+``::1`` on loopback, every ``bind(("::1", port))`` raises EADDRNOTAVAIL,
+which must NOT be read as a port conflict — otherwise every port counts
+as in-use and ``allocate_ports`` can never hand out a port. A missing
+``::1`` must not blind the probe to a v6-only wildcard holder on ``[::]``,
+and a non-family failure of the ``[::]`` probe must count as in-use.
+Genuine ``::1`` and IPv4 conflicts must always be detected.
 
-    uv run pytest tests/gym/utils/backend/test_ports.py
+Run: uv run pytest tests/gym/utils/backend/test_ports.py
 """
 
 from __future__ import annotations
@@ -120,7 +119,7 @@ def test_is_port_free_conservative_on_wildcard_probe_errors(monkeypatch) -> None
     assert ports._is_port_free(port) is False
 
 
-def test_is_port_free_reports_v4_conflict_on_ipv6_absent_host(monkeypatch) -> None:
+def test_is_port_free_reports_v4_conflict_despite_skipped_v6_loopback(monkeypatch) -> None:
     # A real IPv4 listener must still be detected on a host whose ::1 probe
     # is skipped — the skip cannot mask IPv4 occupancy.
     holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
