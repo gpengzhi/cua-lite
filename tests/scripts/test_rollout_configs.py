@@ -631,6 +631,8 @@ _EXPECTED_OPEN_APP_CONFIGS = {
     "scripts/configs/gpt/default/androidworld.yaml",
     "scripts/configs/gpt/default/mobilegym.yaml",
     "scripts/configs/gpt/default/mobileworld.yaml",
+    "scripts/configs/holo4/default/androidworld.yaml",
+    "scripts/configs/holo4/default/mobilegym.yaml",
     "scripts/configs/mai_ui/compact/androidworld.yaml",
     "scripts/configs/mai_ui/compact/mobilegym.yaml",
     "scripts/configs/mai_ui/default/androidlab.yaml",
@@ -675,6 +677,8 @@ _MOBILE_ANSWER_FINISH_CONFIGS = {
     "scripts/configs/gpt/default/androidworld.yaml",
     "scripts/configs/gpt/default/mobilegym.yaml",
     "scripts/configs/gpt/default/mobileworld.yaml",
+    "scripts/configs/holo4/default/androidworld.yaml",
+    "scripts/configs/holo4/default/mobilegym.yaml",
     "scripts/configs/mai_ui/compact/androidworld.yaml",
     "scripts/configs/mai_ui/compact/mobilegym.yaml",
     "scripts/configs/mai_ui/default/androidlab.yaml",
@@ -788,6 +792,7 @@ _EXPECTED_NAV_CONFIGS = {
 
 _EXPECTED_RESPONSE_CONFIGS = {
     "scripts/configs/gpt/default/webgym.yaml",
+    "scripts/configs/holo4/default/lite.osworld.yaml",
 
     # The fara browsergym rows all select ``response`` so a tool-call-free
     # final turn is scored through ``make_no_tool_call_final_actions`` instead
@@ -851,6 +856,8 @@ _EXPECTED_RESPONSE_CONFIGS = {
      | _BROWSERGYM_BID_RESPONSE_TERMINATE_CONFIGS)
 
 _EXPECTED_TERMINATE_CONFIGS = {
+    "scripts/configs/holo4/default/lite.osworld.yaml",
+    "scripts/configs/holo4/default/osworld.yaml",
     "scripts/configs/gpt/default/online_mind2web.yaml",
     "scripts/configs/qwen3_5/default/online_mind2web.yaml",
     "scripts/configs/qwen3_8/default/online_mind2web.yaml",
