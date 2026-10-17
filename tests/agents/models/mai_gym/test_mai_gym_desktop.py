@@ -17,6 +17,7 @@ from lite.agents.core.protocol import ProtocolRegistry
 from lite.agents.models.mai_gym.action_space import (
     MAIGymDesktopActionSpace,
     pyautogui_code_to_lite,
+    render_desktop_block,
 )
 from lite.agents.models.mai_gym.adapter import (
     MAIGymDesktopUseAdapter,
@@ -30,6 +31,7 @@ from lite.agents.models.mai_gym.protocol import (
 )
 from lite.core import LiteCUAMetadata, LiteSample
 from lite.core.tools.action_space import LiteDesktopActionSet
+from lite.core.tools.calls import make_tool_call
 from lite.core.tools.extra_tools import LiteFinishToolSet, LiteShellToolSet
 
 register_all()
@@ -115,6 +117,14 @@ def test_unparseable_reply_keeps_its_visible_prose_as_content() -> None:
     assert parsed["content"] == [{"type": "text", "text": "The answer is 42."}]
     assert parsed["reasoning_content"] == "r"
     assert "tool_calls" not in parsed
+
+
+def test_env_extra_tool_renders_as_a_json_tool_call_block() -> None:
+    call = make_tool_call("goto", {"url": "http://example.com"})
+    (agent_call,) = MAIGymDesktopActionSpace().convert_tool_calls_to_agent([call])
+    assert render_desktop_block(agent_call) == (
+        '<tool_call>{"name": "goto", "arguments": {"url": "http://example.com"}}</tool_call>'
+    )
 
 
 # -- action conversion ---------------------------------------------------------

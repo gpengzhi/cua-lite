@@ -235,9 +235,13 @@ class MAIGymMobileActionSpace(BaseActionSpace, key="mai_gym@mobile"):
                 status=_STATUS_LITE_TO_MAI_GYM.get(status, status),
             )["function"]]
 
-        # ``pinch`` / ``screenshot`` and anything else have no MAI-Gym action;
-        # dropping them would silently lose the action from the wire.
-        raise ValueError(f"MAI-Gym cannot render canonical tool {name!r}")
+        if name in LiteMobileActionSpace.get_action_names():
+            # ``pinch`` / ``screenshot`` have no MAI-Gym action; dropping them
+            # would silently lose the action from the wire.
+            raise ValueError(f"MAI-Gym cannot render canonical tool {name!r}")
+
+        # Anything else is an env extra tool: bare function-call agent wire.
+        return super()._convert_single_to_agent(tool_call)
 
     # -------------------------------------------------------------------------
     # Tool call conversion: MAI-Gym -> cua-lite
@@ -584,6 +588,15 @@ class MAIGymDesktopActionSpace(BaseActionSpace, key="mai_gym@desktop"):
     def get_tool_schemas(cls, include: list[str] | None = None) -> list[dict[str, Any]]:
         return []
 
+    @classmethod
+    def get_declared_action_schema_names(cls) -> frozenset[str]:
+        """Native call names the system prompt orders: ``pyautogui.*`` and ``computer.wait``.
+
+        The wire carries no tool schema, so the names are declared here rather
+        than derived from ``_SCHEMAS``.
+        """
+        return SAFE_PYAUTOGUI_FUNCS | {"wait"}
+
     def _convert_single_to_agent(self, tool_call: dict[str, Any]) -> list[dict[str, Any]]:
         name = tool_call_name(tool_call)
         args = tool_call_arguments(tool_call)
@@ -617,7 +630,9 @@ class MAIGymDesktopActionSpace(BaseActionSpace, key="mai_gym@desktop"):
                 "name": COMPUTER_ASK_USER_TOOL_NAME,
                 "arguments": {"question": args.get("text", "")},
             }]
-        raise ValueError(f"MAI-Gym cannot render canonical tool {name!r}")
+        # Any other name is an env extra tool: bare function-call agent wire,
+        # which ``render_desktop_block`` renders as a JSON ``<tool_call>``.
+        return super()._convert_single_to_agent(tool_call)
 
     def convert_tool_calls_from_agent(
         self,

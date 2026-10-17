@@ -165,3 +165,10 @@ def test_canonical_actions_without_a_native_spelling_raise() -> None:
         space.convert_tool_calls_to_agent(
             [LiteMobileActionSet.pinch(coordinate=[500, 500], direction="in")]
         )
+
+
+def test_env_extra_tool_passes_through_as_bare_function_call() -> None:
+    call = make_tool_call("goto", {"url": "http://example.com"})
+    assert MAIGymMobileActionSpace().convert_tool_calls_to_agent([call]) == [
+        {"name": "goto", "arguments": {"url": "http://example.com"}}
+    ]
