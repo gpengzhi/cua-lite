@@ -471,6 +471,30 @@ def render_mai_gym_desktop_sys_prompt(password: str, *, bash: bool) -> str:
     return prompt
 
 
+# Upstream ``MAIGymComputerUsePolicy._retry_feedback``: the user turn that follows
+# an unparseable reply on a parse retry. The Bash option is cut, as in the
+# system prompt, when the sample offers no ``bash`` tool.
+_MAI_GYM_DESKTOP_RETRY_FEEDBACK = (
+    "Your previous response could not be parsed into an executable action.\n"
+    "Use raw <bash>...</bash>, or one supported pyautogui/wait/terminate "
+    "call inside <tool_call>...</tool_call>. Never call computer.bash.\n\n"
+    "Unparseable previous response excerpt:\n"
+)
+_NO_BASH_RETRY_CUT = ("Use raw <bash>...</bash>, or one supported", "Use one supported")
+_RETRY_EXCERPT_CHARS = 2000
+
+
+def render_mai_gym_desktop_retry_feedback(response: str, *, bash: bool) -> str:
+    """Upstream parse-retry feedback quoting the first 2000 chars of ``response``."""
+    excerpt = response.strip()
+    if len(excerpt) > _RETRY_EXCERPT_CHARS:
+        excerpt = excerpt[:_RETRY_EXCERPT_CHARS] + "\n... [truncated]"
+    feedback = _MAI_GYM_DESKTOP_RETRY_FEEDBACK
+    if not bash:
+        feedback = feedback.replace(*_NO_BASH_RETRY_CUT)
+    return feedback + excerpt
+
+
 # =============================================================================
 # Desktop reply parsing — port of parsing/mai_gym_computer_use.py
 # =============================================================================
@@ -667,6 +691,13 @@ class MAIGymDesktopUseAdapter(MAIGymBaseAdapter, key="mai_gym@desktop@use"):
                 bash=BASH_TOOL_NAME in self.active_extra_tool_names(),
             )
 
+    def render_parse_retry_feedback(self, response: str) -> str:
+        """The correction user turn that follows an unparseable ``response``."""
+        return render_mai_gym_desktop_retry_feedback(
+            response,
+            bash=BASH_TOOL_NAME in self.active_extra_tool_names(),
+        )
+
     def _convert_message_to_agent(
         self,
         message: LiteMessage,
@@ -698,7 +729,12 @@ class MAIGymDesktopUseAdapter(MAIGymBaseAdapter, key="mai_gym@desktop@use"):
         response: str,
         **kwargs,
     ) -> AgentMessage:
-        """Parse one desktop reply; content is the accepted action blocks."""
+        """Parse one desktop reply; content is the accepted action blocks.
+
+        A reply with no accepted block keeps its visible prose (the text after
+        ``</think>``) as content, so the parse-failure final still shows what
+        the model said.
+        """
         reasoning, calls, history, error = parse_mai_gym_desktop_reply(response)
         result: AgentMessage = {"role": "assistant"}
         if reasoning:
@@ -707,8 +743,9 @@ class MAIGymDesktopUseAdapter(MAIGymBaseAdapter, key="mai_gym@desktop@use"):
             result["tool_calls"] = calls
         if error is not None:
             mark_model_output_error(result, error)
-        if history:
-            result["content"] = [{"type": "text", "text": history}]
+        text = history or response.split(_THINK_CLOSE)[-1].strip()
+        if text:
+            result["content"] = [{"type": "text", "text": text}]
         return result
 
 
@@ -717,6 +754,7 @@ __all__ = [
     "MAIGymDesktopUseAdapter",
     "MAIGymMobileUseAdapter",
     "parse_mai_gym_desktop_reply",
+    "render_mai_gym_desktop_retry_feedback",
     "render_mai_gym_desktop_sys_prompt",
     "render_mai_gym_mobile_sys_prompt",
 ]

@@ -195,9 +195,11 @@ their registry key is present.
   of literal `pyautogui.*` / `computer.wait|terminate` calls in [0, 1000] plus
   raw `<bash>` scripts, several per step; `mai_gym.desktop_history` renders one
   user message per step (instruction, `## Bash Output`, screenshot) over the
-  same K=10 / O=2 window. Unparseable replies take the shared parse-failure
-  final (upstream's three regenerations are not reproduced). Bash passages
-  drop from the prompt when the env offers no `bash` tool.
+  same K=10 / O=2 window. Unparseable replies are retried up to
+  `max_parse_retries` (default 3) times, then take the shared parse-failure
+  final: mobile resends the identical prompt, desktop appends the failed reply
+  and upstream's correction message, as the two upstream harnesses do. Bash
+  passages drop from the prompt when the env offers no `bash` tool.
 
 - `step_gui`
   ID: `stepfun-ai/GELab-Zero-4B-preview`.

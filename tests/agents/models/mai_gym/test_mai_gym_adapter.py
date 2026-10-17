@@ -244,6 +244,41 @@ async def test_agent_keeps_history_reasoning_and_trims_the_replay_sidecar() -> N
     }
 
 
+async def test_rumination_is_regenerated_until_a_tool_call_parses() -> None:
+    """Upstream mobile retry: an unclosed ``<think>`` regenerates the identical prompt."""
+    replies = iter(["wait, let me reconsider the tap target...", _RESPONSE])
+    calls: list[tuple[str, list[dict[str, Any]]]] = []
+
+    async def generate(*, prompt: str, messages: list[dict], **_: Any) -> dict[str, Any]:
+        calls.append((prompt, messages))
+        return {"response": next(replies), "finish_reason": "stop"}
+
+    metadata = _metadata(make_open_app_tool(["Files"]), *_finish_schemas())
+    agent = AgentRegistry.get(
+        "mai_gym@mobile@use",
+        processor=_RecordingProcessor(),
+        generate_fn=generate,
+        metadata=metadata,
+    )
+    sample = LiteSample(
+        metadata=metadata,
+        messages=[
+            {
+                "role": "user",
+                "content": [{"type": "image", "index": 0}, {"type": "text", "text": "t"}],
+            }
+        ],
+    )
+    result = await agent._predict_with_details(sample, processed_images=[Image.new("RGB", (8, 8))])
+
+    assert len(calls) == 2
+    assert calls[1] == calls[0]  # no correction turn on mobile
+    assert result.model_output_error is None
+    assert result.lite_message["tool_calls"] == [
+        make_tool_call("open_app", {"app_name": "Files"}, call_id="call_0000")
+    ]
+
+
 def test_catalog_row_and_registries() -> None:
     assert LOCAL_AGENTS["Tongyi-MAI/MAI-Gym-9B"] == {"agent_id": "mai_gym"}
     assert "mai_gym@mobile@use" in AgentRegistry.list()

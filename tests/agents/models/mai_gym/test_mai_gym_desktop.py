@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 from typing import Any
 
@@ -11,7 +12,7 @@ from PIL import Image
 from lite.agents.bootstrap import register_all
 from lite.agents.core.action_space.errors import ModelToolCallParseError
 from lite.agents.core.adapter import AgentAdapterRegistry
-from lite.agents.core.agent import AgentRegistry
+from lite.agents.core.agent import AdapterBasedAgent, AgentRegistry
 from lite.agents.core.protocol import ProtocolRegistry
 from lite.agents.models.mai_gym.action_space import (
     MAIGymDesktopActionSpace,
@@ -20,6 +21,7 @@ from lite.agents.models.mai_gym.action_space import (
 from lite.agents.models.mai_gym.adapter import (
     MAIGymDesktopUseAdapter,
     parse_mai_gym_desktop_reply,
+    render_mai_gym_desktop_retry_feedback,
     render_mai_gym_desktop_sys_prompt,
 )
 from lite.agents.models.mai_gym.protocol import (
@@ -106,6 +108,13 @@ def test_bash_wrapped_in_tool_call_is_unwrapped_like_upstream() -> None:
     )
     assert calls == [{"name": "bash", "arguments": {"command": "echo 1"}}]
     assert history == "<bash>echo 1</bash>"
+
+
+def test_unparseable_reply_keeps_its_visible_prose_as_content() -> None:
+    parsed = _adapter().parse_raw_assistant_response("r\n</think>\nThe answer is 42.")
+    assert parsed["content"] == [{"type": "text", "text": "The answer is 42."}]
+    assert parsed["reasoning_content"] == "r"
+    assert "tool_calls" not in parsed
 
 
 # -- action conversion ---------------------------------------------------------
@@ -258,7 +267,7 @@ class _Processor:
         return f"PROMPT[{len(messages)}]"
 
 
-def _agent(replies: list[str], seen: list[tuple[str, list[dict]]]):
+def _agent(replies: list[str], seen: list[tuple[str, list[dict]]], **agent_kwargs: Any):
     replies_iter = iter(replies)
 
     async def generate(prompt: str, images: list, messages: list[dict]) -> dict[str, Any]:
@@ -271,6 +280,7 @@ def _agent(replies: list[str], seen: list[tuple[str, list[dict]]]):
         generate_fn=generate,
         metadata=_metadata(bash=False),
         password="password",
+        **agent_kwargs,
     )
 
 
@@ -302,15 +312,111 @@ async def test_history_replays_the_reply_verbatim() -> None:
     }
 
 
-async def test_unparseable_reply_takes_the_shared_parse_failure_final() -> None:
+async def test_unparseable_reply_is_retried_with_upstream_correction_turn() -> None:
+    """Upstream computer-use retry: rendered turn + failed reply + correction.
+
+    Only the latest failure rides along (never accumulated), and the rescued
+    turn's RL step records the prompt it was generated from.
+    """
     seen: list[tuple[str, list[dict]]] = []
-    agent = _agent(["bad\n</think>\nno action"], seen)
+    replies = [
+        "still planning the click",  # rumination: think never closed
+        "bad\n</think>\nno action",
+        "ok\n</think>\n<tool_call>pyautogui.click(1, 2)</tool_call>",
+    ]
+    agent = _agent(replies, seen)
+    result = await agent._predict_with_details(
+        _first_turn(), processed_images=[Image.new("RGB", (8, 8))]
+    )
+    assert len(seen) == 3  # two failed attempts, then the rescued one
+    base = seen[0][1]
+    for attempt, failed in ((1, replies[0]), (2, replies[1])):
+        feedback = render_mai_gym_desktop_retry_feedback(failed, bash=False)
+        assert seen[attempt][1] == [
+            *base,
+            {"role": "assistant", "content": [{"type": "text", "text": failed}]},
+            {"role": "user", "content": [{"type": "text", "text": feedback}]},
+        ]
+        assert seen[attempt][0] == f"PROMPT[{len(base) + 2}]"
+    assert result.step.prompt == seen[2][0]
+    assert result.model_output_error is None
+    assert result.lite_message["reasoning_content"] == "ok"
+    # Failed attempts consumed no call ids: the rescued turn stamps from the start.
+    assert [c["id"] for c in result.lite_message["tool_calls"]] == ["call_0000"]
+
+
+def test_retry_feedback_is_upstream_text_with_bash_cut_when_bash_is_off() -> None:
+    reply = "  bad\n</think>\nno action  "
+    assert render_mai_gym_desktop_retry_feedback(reply, bash=True) == (
+        "Your previous response could not be parsed into an executable action.\n"
+        "Use raw <bash>...</bash>, or one supported pyautogui/wait/terminate "
+        "call inside <tool_call>...</tool_call>. Never call computer.bash.\n\n"
+        "Unparseable previous response excerpt:\nbad\n</think>\nno action"
+    )
+    no_bash = render_mai_gym_desktop_retry_feedback(reply, bash=False)
+    assert "<bash>" not in no_bash
+    assert "Use one supported pyautogui/wait/terminate call" in no_bash
+    long_reply = "x" * 2001
+    assert render_mai_gym_desktop_retry_feedback(long_reply, bash=True).endswith(
+        "x" * 2000 + "\n... [truncated]"
+    )
+
+
+async def test_desktop_retry_result_matches_the_base_predict_path() -> None:
+    """``_regenerate`` copies base generate/parse/step; only the prompt may differ."""
+    reply = "ok\n</think>\n<tool_call>pyautogui.click(1, 2)</tool_call>"
+    gen = {
+        "response": reply,
+        "finish_reason": "length",
+        "response_tokens": [1, 2],
+        "response_log_probs": [-0.5, -0.25],
+    }
+
+    async def generate(**_: Any) -> dict[str, Any]:
+        return dict(gen)
+
+    agent = AgentRegistry.get(
+        "mai_gym@desktop@use",
+        processor=_Processor(),
+        generate_fn=generate,
+        metadata=_metadata(bash=False),
+        password="password",
+    )
+    images = [Image.new("RGB", (8, 8))]
+    base = await AdapterBasedAgent._predict_with_details(
+        agent, _first_turn(), processed_images=images, call_id_start=5
+    )
+    failed = dataclasses.replace(base, step=dataclasses.replace(base.step, response="bad"))
+    retried = await agent._regenerate(
+        _first_turn(), processed_images=images, call_id_start=5, failed=failed
+    )
+    assert retried.step.prompt != base.step.prompt
+    assert dataclasses.replace(retried.step, prompt=base.step.prompt) == base.step
+    assert retried.lite_message == base.lite_message
+    assert retried.agent_message == base.agent_message
+    assert retried.model_output_error == base.model_output_error
+
+
+async def test_unparseable_reply_takes_the_shared_parse_failure_final() -> None:
+    """Retries exhausted: the last failed attempt still takes the shared final."""
+    seen: list[tuple[str, list[dict]]] = []
+    agent = _agent(["bad\n</think>\nno action"] * 4, seen)
+    result = await agent._predict_with_details(
+        _first_turn(), processed_images=[Image.new("RGB", (8, 8))]
+    )
+    assert len(seen) == 4  # 1 + max_parse_retries (upstream default 3)
+    assert result.model_output_error == "no_executable_action"
+    assert "tool_calls" not in result.lite_message
+
+
+async def test_max_parse_retries_zero_disables_regeneration() -> None:
+    seen: list[tuple[str, list[dict]]] = []
+    agent = _agent(["bad\n</think>\nno action"], seen, max_parse_retries=0)
     result = await agent._predict_with_details(
         _first_turn(), processed_images=[Image.new("RGB", (8, 8))]
     )
     assert len(seen) == 1
     assert result.model_output_error == "no_executable_action"
-    assert "tool_calls" not in result.lite_message
 
 
 def test_registries() -> None:

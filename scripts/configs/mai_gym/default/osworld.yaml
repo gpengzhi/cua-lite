@@ -6,8 +6,9 @@
 # upstream system prompt with the sudo password, native <think> kept in
 # history (token_native_history), K=10/O=2 screenshot window (paper A.4; eval
 # shares the training harness, Sec. 3.3), 100-step budget, greedy decoding.
-# Unparseable replies end the episode (upstream's three regenerations are not
-# reproduced).
+# Unparseable replies are retried up to three times before the episode ends,
+# as upstream does: each retry appends the failed reply and upstream's
+# correction message to the turn (its Bash option cut, as in the prompt).
 #
 # Deviation: OSWorld's official action space is GUI-only, so this env offers no
 # bash and the adapter cuts every Bash passage from the prompt. The paper's
