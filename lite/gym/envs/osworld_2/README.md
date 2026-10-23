@@ -26,7 +26,7 @@ uv run --no-sync bash lite/gym/envs/osworld_2/scripts/install.sh
 # docker-free prerequisites.
 # uv run --no-sync bash lite/gym/envs/osworld_2/scripts/install.sh pull
 
-# The gated asset snapshot (~3.7 GiB) is a separate script — install.sh is an
+# The gated asset snapshot (~3.4 GiB) is a separate script — install.sh is an
 # image-freshness hash input, and this host-only download must not re-stale images.
 uv run --no-sync bash lite/gym/envs/osworld_2/scripts/provision_assets.sh
 

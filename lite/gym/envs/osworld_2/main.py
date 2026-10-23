@@ -153,17 +153,15 @@ _QCOW2 = _QCOW2_CFG if os.path.isabs(_QCOW2_CFG) else str((Path(ENV_DIR) / _QCOW
 _QCOW2_SIZE = int(_RELEASE["qcow2"]["size"])
 _CACHE_DIR = str(Path(ENV_DIR) / ".cache")
 _TASK_CLASS_DIR = str(Path(_CACHE_DIR) / "task_class")   # gated task_<id>.py, mounted into the container
-_ASSETS_CFG = CFG.server_kwargs["assets_path"]
-_ASSETS_DIR = _ASSETS_CFG if os.path.isabs(_ASSETS_CFG) else str(Path(ENV_DIR) / _ASSETS_CFG)
-_ASSETS_REPO = str(_RELEASE["assets"]["repo"])
-_ASSETS_REVISION = str(_RELEASE["assets"]["revision"])
-_ASSETS_IDENTITY = f"{_ASSETS_REPO}@{_ASSETS_REVISION}"
+_ASSETS_DIR = str(Path(_CACHE_DIR) / "assets")           # gated asset snapshot, mounted :ro at /assets
 _DATA_DIR = Path(ENV_DIR) / "data"                       # vendored id/capability manifests
 _TASKS_REPO = str(_RELEASE["tasks"]["repo"])
 _HF_REVISION = str(_RELEASE["hf_revision"])
 _TASK_IDS = tuple(json.loads((_DATA_DIR / "test_v2.json").read_text(encoding="utf-8"))["tasks"])
 _TASK_COUNT = len(_TASK_IDS)
 _TASK_CLASS_IDENTITY = f"{_TASKS_REPO}@{_HF_REVISION}:{_TASK_COUNT}"
+_ASSETS_REPO = str(_RELEASE["assets"]["repo"])
+_ASSETS_IDENTITY = f"{_ASSETS_REPO}@{_HF_REVISION}"
 
 _README = "lite/gym/envs/osworld_2/README.md"
 _INSTALL = "uv run --no-sync bash lite/gym/envs/osworld_2/scripts/install.sh"

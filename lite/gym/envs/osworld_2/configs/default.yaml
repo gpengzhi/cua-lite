@@ -33,9 +33,6 @@ env_kwargs:                  # per-instance OSWorldV2Env defaults (overridable p
 server_kwargs:               # per-deployment container/infra config (deploy-time only)
   image: "cua-lite/osworld_2:latest"               # DERIVED image (FROM happysixd/osworld-docker + V2 desktop_env + docker/server.py), BUILT by install.sh
   qcow2_path: ".cache/osworld-v2-ubuntu-x86.qcow2" # V2 gated qcow2 (relative → <env>/.cache/); provisioned by install.sh
-  assets_path: ".cache/assets"                     # gated asset snapshot (relative → <env>/.cache/); provisioned by
-                                                    # scripts/provision_assets.sh (outside install.sh — a freshness hash
-                                                    # input), mounted :ro at /assets with OSWORLD_FILE_BASE_URL
   ram_size: "4G"             # -e RAM_SIZE — OSWorld upstream VM spec (provider default)
   cpu_cores: "4"             # -e CPU_CORES
   disk_size: "32G"           # -e DISK_SIZE; volume tasks are EXCLUDED + volume_size deferred to None server-side

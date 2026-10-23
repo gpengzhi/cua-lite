@@ -114,10 +114,9 @@ def test_release_manifest_matches_runtime_constants():
     assert str(release["hf_revision"]) == m._HF_REVISION
     assert str(release["tasks"]["repo"]) == m._TASKS_REPO
     assert str(release["assets"]["repo"]) == m._ASSETS_REPO
-    assert str(release["assets"]["revision"]) == m._ASSETS_REVISION
     assert len(m._TASK_IDS) == 108
     assert m._TASK_CLASS_IDENTITY == (f"{m._TASKS_REPO}@{m._HF_REVISION}:{len(m._TASK_IDS)}")
-    assert m._ASSETS_IDENTITY == f"{m._ASSETS_REPO}@{m._ASSETS_REVISION}"
+    assert m._ASSETS_IDENTITY == f"{m._ASSETS_REPO}@{m._HF_REVISION}"
 
 
 def test_qcow2_gate_checks_size(tmp_path, monkeypatch):
@@ -816,7 +815,8 @@ def test_container_name_disjoint_from_v1_and_lite():
     from lite.gym.envs.osworld_2.container import OSWorldV2ContainerFactory
 
     f = OSWorldV2ContainerFactory(
-        qcow2_path="/x.qcow2", task_class_dir="/tc", session_id="s", task_id="001"
+        qcow2_path="/x.qcow2", task_class_dir="/tc", assets_path="/assets",
+        session_id="s", task_id="001",
     )
     name = f._make_name("abc123")
     assert "-osworld_2-" in name

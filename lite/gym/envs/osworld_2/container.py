@@ -222,7 +222,7 @@ class OSWorldV2ContainerFactory:
 
     qcow2_path: str
     task_class_dir: str
-    assets_path: str = ""
+    assets_path: str
     image: str = _IMAGE_DEFAULT
     ram_size: str = "4G"
     cpu_cores: str = "4"

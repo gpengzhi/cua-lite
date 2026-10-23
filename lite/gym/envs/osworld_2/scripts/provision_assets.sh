@@ -24,13 +24,15 @@ ASSETS_DIR="$ENV_DIR/.cache/assets"
 # Shared invocation contract (python = the venv interpreter; uv pip, never bare pip).
 source "$REPO_ROOT/lite/gym/scripts/image_build.sh"
 
-read -r ASSETS_REPO ASSETS_REVISION ASSETS_IDENTITY < <(
+read -r ASSETS_REPO HF_REVISION ASSETS_IDENTITY < <(
     python - "$ENV_DIR/data/release.json" <<'PY'
 import json
 import sys
 
-assets = json.load(open(sys.argv[1], encoding="utf-8"))["assets"]
-print(assets["repo"], assets["revision"], f"{assets['repo']}@{assets['revision']}")
+release = json.load(open(sys.argv[1], encoding="utf-8"))
+assets_repo = release["assets"]["repo"]
+hf_revision = release["hf_revision"]
+print(assets_repo, hf_revision, f"{assets_repo}@{hf_revision}")
 PY
 )
 
@@ -41,9 +43,11 @@ fi
 
 require_uv
 uv pip install -q huggingface_hub
-echo "[provision_assets] HF-gated download $ASSETS_REPO@$ASSETS_REVISION (complete asset snapshot, ~3.7 GiB) ..." >&2
+echo "[provision_assets] HF-gated download $ASSETS_REPO@$HF_REVISION (complete asset snapshot, ~3.4 GiB) ..." >&2
+# Start clean so the dir mirrors the pinned revision exactly — snapshot_download RESUMES
+# into a pre-existing local_dir, keeping files the current pin no longer lists.
 rm -rf "$ASSETS_DIR"
-python - "$ASSETS_REPO" "$ASSETS_REVISION" "$ASSETS_DIR" "$ASSETS_IDENTITY" <<'PY'
+python - "$ASSETS_REPO" "$HF_REVISION" "$ASSETS_DIR" "$ASSETS_IDENTITY" <<'PY'
 import sys
 from huggingface_hub import snapshot_download
 from huggingface_hub.utils import GatedRepoError
