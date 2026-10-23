@@ -9,5 +9,9 @@
   },
   "tasks": {
     "repo": "xlangai/osworld_v2_tasks"
+  },
+  "assets": {
+    "repo": "xlangai/osworld_v2_assets_gated",
+    "revision": "v2026.06.24"
   }
 }
