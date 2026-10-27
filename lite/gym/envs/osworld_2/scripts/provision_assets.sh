@@ -1,9 +1,10 @@
 #!/bin/bash
-# Provision the osworld_2 gated asset snapshot — self-contained + idempotent.
+# Provision the osworld_2 gated asset snapshot — self-contained, idempotent, resumable.
 #
 # Downloads the complete xlangai/osworld_v2_assets_gated set pinned by data/release.json
 # into <env>/.cache/assets/ and stamps .assets_revision (required by the _check_assets gate
 # in main.py; the container mounts the dir :ro at /assets with OSWORLD_FILE_BASE_URL=/assets).
+# An interrupted download of the same pin resumes on re-run instead of starting over.
 # The public xlangai/osworld_v2_assets repo is only a minimal subset — this release's assets
 # 404 there and the nested retries blow the 300 s reset RPC timeout.
 #
@@ -20,6 +21,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 ENV_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$ENV_DIR/../../../.." && pwd)"
 ASSETS_DIR="$ENV_DIR/.cache/assets"
+STAMP="$ASSETS_DIR/.assets_revision"    # written after a complete download; read by main.py
+PARTIAL="$ASSETS_DIR/.assets_partial"   # the pin an in-progress download belongs to
 
 # Shared invocation contract (python = the venv interpreter; uv pip, never bare pip).
 source "$REPO_ROOT/lite/gym/scripts/image_build.sh"
@@ -36,7 +39,7 @@ print(assets_repo, hf_revision, f"{assets_repo}@{hf_revision}")
 PY
 )
 
-if [ -f "$ASSETS_DIR/.assets_revision" ] && [ "$(cat "$ASSETS_DIR/.assets_revision")" = "$ASSETS_IDENTITY" ]; then
+if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$ASSETS_IDENTITY" ]; then
     echo "[provision_assets] asset snapshot present ($ASSETS_IDENTITY); skipping." >&2
     exit 0
 fi
@@ -44,9 +47,16 @@ fi
 require_uv
 uv pip install -q huggingface_hub
 echo "[provision_assets] HF-gated download $ASSETS_REPO@$HF_REVISION (complete asset snapshot, ~3.4 GiB) ..." >&2
-# Start clean so the dir mirrors the pinned revision exactly — snapshot_download RESUMES
-# into a pre-existing local_dir, keeping files the current pin no longer lists.
-rm -rf "$ASSETS_DIR"
+# snapshot_download RESUMES into a pre-existing local_dir, keeping files the current pin no
+# longer lists. Resume only a partial download of this same pin; start clean otherwise
+# (another pin's snapshot or partial, or an unmarked dir) so the dir mirrors the pin exactly.
+if [ -f "$PARTIAL" ] && [ "$(cat "$PARTIAL")" = "$ASSETS_IDENTITY" ]; then
+    echo "[provision_assets] resuming interrupted download." >&2
+else
+    rm -rf "$ASSETS_DIR"
+    mkdir -p "$ASSETS_DIR"
+    echo "$ASSETS_IDENTITY" > "$PARTIAL"
+fi
 python - "$ASSETS_REPO" "$HF_REVISION" "$ASSETS_DIR" "$ASSETS_IDENTITY" <<'PY'
 import sys
 from huggingface_hub import snapshot_download
@@ -59,3 +69,4 @@ except GatedRepoError:
 open(f"{dest}/.assets_revision", "w").write(identity + "\n")
 print(f"[provision_assets] asset snapshot ready ({identity}).", file=sys.stderr)
 PY
+rm -f "$PARTIAL"
